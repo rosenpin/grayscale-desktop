@@ -2,6 +2,7 @@
 
 # should also work with compositor=compton, untested
 compositor=picom
+toggle_mode=0
 
 function usage {
 
@@ -33,7 +34,6 @@ function usage {
 }
 
 function toggle_nvidia {
-
     dpy=$1
     
     value=$(nvidia-settings -t -q DigitalVibrance)
@@ -42,12 +42,20 @@ function toggle_nvidia {
     # -1024 => full grayscale
     desaturate_value=-1024
     
-    if (( value == $desaturate_value )); then
-	value=0
-	toggle_mode="color"
+    if [[ -z $toggle_mode ]]; then
+        if (( value == $desaturate_value )); then
+        value=0
+        toggle_mode="color"
+        else
+        value=$desaturate_value
+        toggle_mode="grayscale"
+        fi
+    fi
+
+    if [[ "$toggle_mode" == "color" ]]; then
+        value=0
     else
-	value=$desaturate_value
-	toggle_mode="grayscale"
+        value=$desaturate_value
     fi
 
     if [ -n "$dpy" ]; then
@@ -60,15 +68,14 @@ function toggle_nvidia {
 }
 
 function toggle_compositor {
-
     if pgrep -a -x $compositor | grep glx-fshader-win > /dev/null; then
-	pkill -x $compositor
-	sleep 1
-	$compositor $* -b
-	toggle_mode="color"
+    pkill -x $compositor
+    sleep 1
+    $compositor $* -b
+    toggle_mode="color"
     else
-	pkill -x $compositor
-	sleep 1
+    pkill -x $compositor
+    sleep 1
 
 	shader='uniform sampler2D tex; uniform float opacity; void main() { vec4 c = texture2D(tex, gl_TexCoord[0].xy); float y = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722)); gl_FragColor = opacity*vec4(y, y, y, c.a); }'
 	
@@ -77,92 +84,43 @@ function toggle_compositor {
     fi
 }
 
-function toggle_ddc {
-    
-    out=($(ddcutil $* getvcp 8a -t))
-    
-    if (( $? != 0 )); then
-	echo "ddc: this monitor does not support saturation control"
-	exit 1
-    fi
+arg=$1
+mode=auto
 
-    # out array:
-    #
-    # VCP 8A C 100 200
-    #           |   |
-    #          cur max
-   
-    if (( ${#out[@]} != 5 )); then
-	echo "ddc: unexpected output getting current saturation state"
-	exit 1
-    fi
-
-    cur_saturation=${out[3]}
-    max_saturation=${out[4]}
-
-    # set a value in ]0..max/2[ range to desaturate colors instead of full grayscale
-    # 0 => full grayscale
-    desaturate_value=0
-
-    if (( cur_saturation == desaturate_value  )); then
-	new_saturation=$(( max_saturation / 2 )) # nominal saturation 
-	toggle_mode="color"
-    else
-        new_saturation=$desaturate_value
-	toggle_mode="grayscale"
-    fi
-
-    ddcutil $* setvcp 8a $new_saturation
-}
-
-mode=$1
-
-case $mode in
+case $arg in
 
     --help|-h)
 	usage
 	;;
 
-    $compositor)
-	if ! pgrep -x $compositor > /dev/null; then
-            echo "$compositor is not running"
-            exit 1
-	fi
-	;;
-
-    nvidia)
-	if ! which nvidia-settings &> /dev/null; then
-	    echo "nvidia-settings is not installed"
-	    exit 1
-	fi
-	;;	   	
-    ddc)
-	if ! which ddcutil &> /dev/null; then 
-	    echo "ddcutil is not installed"
-	    exit 1
-	fi
+    --grayscale|-g)
+        toggle_mode="grayscale"
         ;;
-    
-    *)
-	[ -z "$mode" ] && mode=auto
-	
-	if [ "$mode" = "auto" ]; then
 
-	    if pgrep -x $compositor > /dev/null; then
-		mode=$compositor
-	    elif which nvidia-settings &> /dev/null; then
-		mode=nvidia
-	    elif which ddcutil &> /dev/null; then
-		mode=ddc
-	    else
-		echo "neither $compositor is running, nor nvidia-settings installed, nor ddcutil installed"
-		exit 1
-	    fi
-	else
-	    usage
-	fi
+    --color|-c)
+        toggle_mode="color"
+        ;;
+    *)
+	
+	
 	
 esac
+
+if [ "$mode" = "auto" ]; then
+    if pgrep -x $compositor > /dev/null; then
+    mode=$compositor
+    elif which nvidia-settings &> /dev/null; then
+    mode=nvidia
+    elif which ddcutil &> /dev/null; then
+    mode=ddc
+    else
+    echo "neither $compositor is running, nor nvidia-settings installed, nor ddcutil installed"
+    exit 1
+    fi
+else
+    usage
+fi
+
 
 # pass eventual remaining arguments to toggle_* function
 if (( $# > 0 )); then
@@ -174,7 +132,7 @@ if [ "$mode" = "nvidia" ]; then
 elif [ "$mode" = "$compositor" ]; then
     toggle_compositor $*
 else
-    toggle_ddc $*
+    echo "no mode, doing nothing"
 fi
 
 if (( $? == 0 )); then
