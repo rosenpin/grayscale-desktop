@@ -41,8 +41,12 @@ function toggle_nvidia {
     # set a value in ]-1024..0[ range to desaturate colors instead of full grayscale
     # -1024 => full grayscale
     desaturate_value=-1024
-    
-    if [[ -z $toggle_mode ]]; then
+
+    if [[ "$toggle_mode" == "color" ]]; then
+        value=0
+    elif [[ "$toggle_mode" == "grayscale" ]]; then
+        value=$desaturate_value
+    else
         if (( value == $desaturate_value )); then
         value=0
         toggle_mode="color"
@@ -52,35 +56,46 @@ function toggle_nvidia {
         fi
     fi
 
-    if [[ "$toggle_mode" == "color" ]]; then
-        value=0
-    else
-        value=$desaturate_value
-    fi
-
     if [ -n "$dpy" ]; then
-	param="[DPY:$dpy]/DigitalVibrance"
+        param="[DPY:$dpy]/DigitalVibrance"
     else
-	param="DigitalVibrance"
+        param="DigitalVibrance"
     fi
 
     nvidia-settings -a ${param}=${value} > /dev/null
 }
 
-function toggle_compositor {
-    if pgrep -a -x $compositor | grep glx-fshader-win > /dev/null; then
-    pkill -x $compositor
-    sleep 1
-    $compositor $* -b
-    toggle_mode="color"
-    else
-    pkill -x $compositor
-    sleep 1
+function _compositor_grayscale {
+        pkill -x $compositor
+        sleep 1
 
-	shader='uniform sampler2D tex; uniform float opacity; void main() { vec4 c = texture2D(tex, gl_TexCoord[0].xy); float y = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722)); gl_FragColor = opacity*vec4(y, y, y, c.a); }'
-	
-	$compositor $* -b --backend glx --glx-fshader-win "${shader}" 2> /dev/null
-	toggle_mode="grayscale"
+        shader='uniform sampler2D tex; uniform float opacity; void main() { vec4 c = texture2D(tex, gl_TexCoord[0].xy); float y = dot(c.rgb, vec3(0.2126, 0.7152, 0.0722)); gl_FragColor = opacity*vec4(y, y, y, c.a); }'
+        
+        $compositor $* -b --backend glx --glx-fshader-win "${shader}" 2> /dev/null
+        toggle_mode="grayscale"
+}
+
+function _compositor_color {
+        pkill -x $compositor
+        sleep 1
+        $compositor $* -b
+}
+
+
+function toggle_compositor {
+    if [[ "$toggle_mode" == "color" ]]; then
+        _compositor_color
+    elif [[ "$toggle_mode" == "grayscale" ]]; then
+        _compositor_grayscale
+    fi
+
+
+    if [[ -z $toggle_mode ]]; then
+        if pgrep -a -x $compositor | grep glx-fshader-win > /dev/null; then
+            _compositor_color
+        else
+            _compositor_grayscale
+        fi
     fi
 }
 
@@ -108,14 +123,14 @@ esac
 
 if [ "$mode" = "auto" ]; then
     if pgrep -x $compositor > /dev/null; then
-    mode=$compositor
+        mode=$compositor
     elif which nvidia-settings &> /dev/null; then
-    mode=nvidia
+        mode=nvidia
     elif which ddcutil &> /dev/null; then
-    mode=ddc
+        mode=ddc
     else
-    echo "neither $compositor is running, nor nvidia-settings installed, nor ddcutil installed"
-    exit 1
+        echo "neither $compositor is running, nor nvidia-settings installed, nor ddcutil installed"
+        exit 1
     fi
 else
     usage
