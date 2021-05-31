@@ -1,6 +1,7 @@
-# toggle-monitor-grayscale
+# grayscale-desktop
 This script toggles your Xorg monitor(s) between color and grayscale.
-It can be bound to a keyboard shortcut to easily toggle on the fly.
+It can be bound to a keyboard shortcut to easily toggle on the fly.  
+Aims to be a simplified version of https://github.com/bubbleguuum/toggle-monitor-grayscale
 
 ## Why ?
 
@@ -9,10 +10,6 @@ Especially combined with a warm monitor color preset (that filters out most blue
 for both your Desktop Environment and apps, for creating a paper-like looking desktop.
 Try it and you might be surprised !
 - grayscale can increase concentration and reduces distractions. I've also found it to have a calming effect
-
-## How does it work ?
-
-The script can turn the monitor into grayscale using 3 separate methods:
 
 ### Compositor based method
 
@@ -52,31 +49,6 @@ colors to grayscale.
 - minor: grayscale persists if you exit Xorg without resetting color
 - minor: Digital Vibrance cannot be captured on screenshots, thus always in color
 
-### DDC/CI based method
-
-DDC/CI is a protocol that allows a program to change monitor settings, such as contrast, brightness and more.
-Here, we use program [`ddcutil`](https://github.com/rockowitz/ddcutil/) to change the saturation parameter of a monitor (if it supports it), setting saturation to 0 for grayscale.
-
-You will need to install the `ddcutil` tool, likely available as a package for your distro.
-Your monitor must support DDC/CI. Most of them support it, but on some monitors DDC/CI can be enabled/isabled in its OSD, so make sure
-to check that.
-
-Then try `toggle-monitor-grayscale.sh ddc` to check if `ddcutil` detects your monitor and supports changing the saturation attribute.
-If `ddcutil` does not detect your monitor, look into its documentation for possible solutions.
-
-##### Advantages
-
-- not specific to a compositor nor graphic card
-- can be applied to only a specific monitor (see usage)
-- can be used to only desaturate colors instead of full grayscale. 
-  Edit script and set variable `desaturate_value` in function `toggle_ddc` to a value between 0 and maximum saturation / 2 (0 => full grayscale)
-- simplier than restarting the compositor  
-
-##### Drawbacks
-
-- does not work with all monitors
-- does not work with laptop panels as they do not support DDC/CI 
-
 ## Comparison between compositor and NVIDIA methods
 
 It is not possible to make a screenshot of a graycaled screen with the NVIDIA method (unlike the compositor method).
@@ -86,35 +58,13 @@ to the NVIDIA method but not have any effect on the already grayscaled composito
 It turns out that the NVIDIA method produces darker grayscale than the compositor method, preserving more details on images such as photos (at the expense of
 making them darker). The difference between the 2 methods is marginal for text.
 
-## Get the script
-
-```
-cd /somewhere/in/your/PATH
-wget https://raw.githubusercontent.com/bubbleguuum/toggle-monitor-grayscale/main/toggle-monitor-grayscale.sh && chmod +x toggle-monitor-grayscale.sh
-```
-
 ## Usage
 
 ```
 toggle-monitor-grayscale.sh -h
 
-toggle-monitor-grayscale.sh [picom|nvidia|ddc|auto]
-toggle-monitor-grayscale.sh picom [picom args]
-toggle-monitor-grayscale.sh nvidia [nv mon]
-toggle-monitor-grayscale.sh ddc [ddc mon]
-
-picom:   use a GLX shader to set grayscale
-nvidia:  use NVIDIA proprietary driver Digital Vibrance setting to set grayscale
-ddc:     use DDC/CI monitor protocol to set the monitor saturation to 0 (grayscale) if supported by monitor
-auto:    use picom if running, otherwise nvidia if available, otherwise ddc if available
-
-picom args: in picom mode, optional picom parameters
-
-nv mon:     in nvidia mode, an optional monitor name as enumerated by xrandr.
-            if unspecified, apply to all monitors managed by the NVIDIA driver
-ddc mon:    in ddc mode, optional ddcutil options to identify the monitor. See 'man ddcutil'
-            if unspecified, apply to the first monitor detected by ddcutil
-if invoked with no argument, auto is used.
+toggle-monitor-grayscale.sh -g (enables grayscale)
+toggle-monitor-grayscale.sh -c (disables grayscale)
 ```
 
 ## Improving grayscale experience
